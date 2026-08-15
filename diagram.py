@@ -1,324 +1,681 @@
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle, Circle
+from matplotlib.patches import Polygon, Circle
 
 
-def create_part16_drawing(part, output_file="Part_16_Drawing.png"):
+def create_part16_drawing(
+    part,
+    output_file="Part_16_Drawing.png"
+):
+    """
+    BOMVision - Part No. 16 Engineering Drawing
 
-    # -----------------------------
-    # Read data from BOM parser
-    # -----------------------------
+    Reference dimensions:
+        Width       = 82 mm
+        Height      = 332 mm
+        Thickness   = 8 mm
+        Hole count  = 2
+        Hole dia    = 14 mm
+        Hole X      = 35 mm
+        Hole offset = 11 mm
+        Hole-to-hole= 310 mm
+        Bolt        = M12
 
-    part_no = part["part_no"]
+    Drawing is constructed using fixed engineering coordinates
+    so that the generated image follows the supplied reference.
+    """
 
-    width = float(part["width"])
-    height = float(part["height"])
-    thickness = float(part["thickness"])
+    # ==========================================================
+    # 1. READ BOM DATA
+    # ==========================================================
 
-    hole_count = int(part["hole_count"])
-    hole_diameter = float(part["hole_diameter"])
+    part_no = str(part.get("part_no", 16))
 
-    dimension_35 = float(part["dimension_35"])
-    dimension_11 = float(part["dimension_11"])
-    dimension_310 = float(part["dimension_310"])
+    width = float(part.get("width", 82))
+    height = float(part.get("height", 332))
+    thickness = float(part.get("thickness", 8))
 
-    bolt = part["bolt"]
-    material = part["material"]
+    hole_count = int(part.get("hole_count", 2))
+    hole_diameter = float(part.get("hole_diameter", 14))
 
-    # -----------------------------
-    # Create figure
-    # -----------------------------
+    dimension_35 = float(part.get("dimension_35", 35))
+    dimension_11 = float(part.get("dimension_11", 11))
+    dimension_310 = float(part.get("dimension_310", 310))
 
-    fig, ax = plt.subplots(figsize=(8.27, 11.69))
+    bolt = str(part.get("bolt", "M12"))
 
-    # Position of plate
-    x0 = 30
-    y0 = 40
+    # ==========================================================
+    # 2. DRAWING COORDINATES
+    # ==========================================================
 
-    # -----------------------------
-    # Draw plate
-    # -----------------------------
+    # Main plate
+    x_left = 0
+    x_right = width
 
-    plate = Rectangle(
-        (x0, y0),
-        width,
-        height,
+    y_bottom = 0
+    y_top = height
+
+    # ----------------------------------------------------------
+    # IMPORTANT:
+    #
+    # The actual plate is 82 x 332.
+    #
+    # Therefore:
+    #
+    #       width  = 82
+    #       height = 332
+    #
+    # This keeps the correct narrow vertical appearance.
+    # ----------------------------------------------------------
+
+    # Chamfer
+    chamfer = 8
+
+    # Hole X position
+    hole_x = dimension_35
+
+    # Hole Y positions
+    bottom_hole_y = dimension_11
+    top_hole_y = height - dimension_11
+
+    hole_radius = hole_diameter / 2
+
+    # ==========================================================
+    # 3. FIGURE
+    # ==========================================================
+
+    fig, ax = plt.subplots(
+        figsize=(7.4, 12.5),
+        dpi=200
+    )
+
+    # ==========================================================
+    # 4. MAIN PLATE
+    # ==========================================================
+    #
+    #                 82
+    #        ┌────────────────┐
+    #       /                 │
+    #      │                  │
+    #      │                  │
+    #      │                  │
+    #       \────────────────┘
+    #
+    # ==========================================================
+
+    plate_points = [
+        (x_left + chamfer, y_top),
+        (x_right, y_top),
+        (x_right, y_bottom),
+        (x_left + chamfer, y_bottom),
+        (x_left, y_bottom + chamfer),
+        (x_left, y_top - chamfer)
+    ]
+
+    plate = Polygon(
+        plate_points,
+        closed=True,
         fill=False,
-        linewidth=1.5
+        edgecolor="black",
+        linewidth=1.35,
+        joinstyle="miter"
     )
 
     ax.add_patch(plate)
 
-    # -----------------------------
-    # Hole positions
-    # -----------------------------
+    # ==========================================================
+    # 5. HOLES
+    # ==========================================================
 
-    hole_x = x0 + dimension_35
+    hole_positions = []
 
-    hole_bottom_y = y0 + dimension_11
-    hole_top_y = y0 + height - dimension_11
-
-    hole_radius = hole_diameter / 2
-
-    # Bottom hole
     if hole_count >= 1:
-
-        bottom_hole = Circle(
-            (hole_x, hole_bottom_y),
-            hole_radius,
-            fill=False,
-            linewidth=1.2
+        hole_positions.append(
+            (hole_x, bottom_hole_y)
         )
 
-        ax.add_patch(bottom_hole)
-
-    # Top hole
     if hole_count >= 2:
-
-        top_hole = Circle(
-            (hole_x, hole_top_y),
-            hole_radius,
-            fill=False,
-            linewidth=1.2
+        hole_positions.append(
+            (hole_x, top_hole_y)
         )
 
-        ax.add_patch(top_hole)
+    for hx, hy in hole_positions:
 
-    # -----------------------------
-    # Center marks
-    # -----------------------------
+        # ------------------------------------------------------
+        # Hole circle
+        # ------------------------------------------------------
 
-    for hx, hy in [
-        (hole_x, hole_bottom_y),
-        (hole_x, hole_top_y)
-    ]:
+        circle = Circle(
+            (hx, hy),
+            hole_radius,
+            fill=False,
+            edgecolor="black",
+            linewidth=1.05
+        )
+
+        ax.add_patch(circle)
+
+        # ------------------------------------------------------
+        # Horizontal center line
+        # ------------------------------------------------------
 
         ax.plot(
-            [hx - 8, hx + 8],
+            [hx - 7, hx + 7],
             [hy, hy],
-            linewidth=0.5
+            color="black",
+            linewidth=0.45
         )
+
+        # ------------------------------------------------------
+        # Vertical center line
+        # ------------------------------------------------------
 
         ax.plot(
             [hx, hx],
-            [hy - 8, hy + 8],
-            linewidth=0.5
+            [hy - 7, hy + 7],
+            color="black",
+            linewidth=0.45
         )
 
-    # -----------------------------
-    # Width dimension - 82
-    # -----------------------------
+    # ==========================================================
+    # 6. DIMENSION SLASH
+    # ==========================================================
+    #
+    # Reference uses:
+    #
+    #       /──────────────/
+    #
+    # NOT:
+    #
+    #       <──────────────>
+    #
+    # ==========================================================
 
-    dimension_y = y0 - 25
+    def slash_tick(
+        x,
+        y,
+        size=5,
+        linewidth=1.1
+    ):
 
-    ax.plot(
-        [x0, x0],
-        [y0, dimension_y],
-        linewidth=0.5
-    )
-
-    ax.plot(
-        [x0 + width, x0 + width],
-        [y0, dimension_y],
-        linewidth=0.5
-    )
-
-    ax.annotate(
-        "",
-        xy=(x0 + width, dimension_y),
-        xytext=(x0, dimension_y),
-        arrowprops=dict(
-            arrowstyle="<->",
-            linewidth=0.8
+        ax.plot(
+            [x - size, x + size],
+            [y - size, y + size],
+            color="black",
+            linewidth=linewidth,
+            solid_capstyle="butt"
         )
+
+    # ==========================================================
+    # 7. 82 MM DIMENSION
+    # ==========================================================
+    #
+    #             82
+    #       /────────────/
+    #
+    # ==========================================================
+
+    dim82_y = y_top + 30
+
+    # Left extension
+    ax.plot(
+        [x_left, x_left],
+        [y_top - 3, dim82_y],
+        color="black",
+        linewidth=0.65
     )
 
+    # Right extension
+    ax.plot(
+        [x_right, x_right],
+        [y_top - 3, dim82_y],
+        color="black",
+        linewidth=0.65
+    )
+
+    # Horizontal dimension line
+    ax.plot(
+        [x_left, x_right],
+        [dim82_y, dim82_y],
+        color="black",
+        linewidth=0.8
+    )
+
+    # Slash marks
+    slash_tick(x_left, dim82_y)
+    slash_tick(x_right, dim82_y)
+
+    # 82 text
     ax.text(
-        x0 + width / 2,
-        dimension_y + 5,
-        "82",
+        (x_left + x_right) / 2,
+        dim82_y + 7,
+        f"{width:g}",
         ha="center",
-        fontsize=9
+        va="bottom",
+        fontsize=13
     )
 
-    # -----------------------------
-    # Height dimension - 332
-    # -----------------------------
+    # ==========================================================
+    # 8. 35 MM DIMENSION
+    # ==========================================================
+    #
+    #              35
+    #             /────/
+    #                 |
+    #                 |
+    #                 |
+    #
+    #  IMPORTANT:
+    #  35 is BELOW 82.
+    #
+    # ==========================================================
 
-    dimension_x = x0 + width + 35
+    dim35_y = y_top + 9
 
+    # Left extension
     ax.plot(
-        [x0 + width, dimension_x],
-        [y0, y0],
-        linewidth=0.5
+        [hole_x, hole_x],
+        [y_top + 2, dim35_y - 1],
+        color="black",
+        linewidth=0.65
     )
 
+    # Hole position extension
     ax.plot(
-        [x0 + width, dimension_x],
-        [y0 + height, y0 + height],
-        linewidth=0.5
+        [x_right, x_right],
+        [y_top + 2, dim35_y - 1],
+        color="black",
+        linewidth=0.65
     )
 
-    ax.annotate(
-        "",
-        xy=(dimension_x, y0 + height),
-        xytext=(dimension_x, y0),
-        arrowprops=dict(
-            arrowstyle="<->",
-            linewidth=0.8
-        )
+    # Horizontal dimension
+    ax.plot(
+        [hole_x, x_right],
+        [dim35_y, dim35_y],
+        color="black",
+        linewidth=0.8
     )
 
+    # Slash marks
+    slash_tick(hole_x, dim35_y)
+    slash_tick(x_right, dim35_y)
+
+    # 35 text
     ax.text(
-        dimension_x + 5,
-        y0 + height / 2,
-        "332",
-        rotation=90,
-        va="center",
-        fontsize=9
-    )
-
-    # -----------------------------
-    # 310 dimension
-    # -----------------------------
-
-    dimension_x_310 = x0 + width + 15
-
-    start_310 = y0 + dimension_11
-    end_310 = y0 + height - dimension_11
-
-    ax.annotate(
-        "",
-        xy=(dimension_x_310, end_310),
-        xytext=(dimension_x_310, start_310),
-        arrowprops=dict(
-            arrowstyle="<->",
-            linewidth=0.8
-        )
-    )
-
-    ax.text(
-        dimension_x_310 + 4,
-        (start_310 + end_310) / 2,
-        "310",
-        rotation=90,
-        va="center",
-        fontsize=9
-    )
-
-    # -----------------------------
-    # 35 dimension
-    # -----------------------------
-
-    dimension_y_35 = y0 + height + 20
-
-    ax.annotate(
-        "",
-        xy=(hole_x, dimension_y_35),
-        xytext=(x0, dimension_y_35),
-        arrowprops=dict(
-            arrowstyle="<->",
-            linewidth=0.8
-        )
-    )
-
-    ax.text(
-        (x0 + hole_x) / 2,
-        dimension_y_35 + 5,
-        "35",
+        (hole_x + x_right) / 2,
+        dim35_y + 7,
+        f"{dimension_35:g}",
         ha="center",
-        fontsize=9
+        va="bottom",
+        fontsize=13
     )
 
-    # -----------------------------
-    # Hole information
-    # -----------------------------
+    # ==========================================================
+    # 9. 11 MM DIMENSION
+    # ==========================================================
+    #
+    # Reference:
+    #
+    #         ──────────/
+    #                 11
+    #                 /
+    #         ────────/
+    #
+    # ==========================================================
 
-    ax.text(
-        x0 - 5,
-        y0 + height + 55,
-        f"{hole_count} - Ø{hole_diameter} HOLE",
-        fontsize=9
+    dim11_x = x_right + 35
+
+    # Top horizontal extension
+    ax.plot(
+        [x_right, dim11_x],
+        [y_top, y_top],
+        color="black",
+        linewidth=0.65
     )
 
+    # Hole center horizontal extension
+    ax.plot(
+        [hole_x, dim11_x],
+        [top_hole_y, top_hole_y],
+        color="black",
+        linewidth=0.65
+    )
+
+    # Vertical dimension line
+    ax.plot(
+        [dim11_x, dim11_x],
+        [top_hole_y, y_top],
+        color="black",
+        linewidth=0.8
+    )
+
+    # Slash at top
+    slash_tick(
+        dim11_x,
+        y_top,
+        size=5
+    )
+
+    # Slash at hole center
+    slash_tick(
+        dim11_x,
+        top_hole_y,
+        size=5
+    )
+
+    # 11 text
     ax.text(
-        x0 - 5,
-        y0 + height + 45,
+        dim11_x - 9,
+        (y_top + top_hole_y) / 2,
+        f"{dimension_11:g}",
+        rotation=90,
+        ha="center",
+        va="center",
+        fontsize=12
+    )
+
+    # ==========================================================
+    # 10. 310 MM DIMENSION
+    # ==========================================================
+    #
+    # THIS IS IMPORTANT.
+    #
+    # The reference has horizontal lines coming directly
+    # from both hole centers.
+    #
+    #       ○──────────────────╲
+    #                           │
+    #                          310
+    #                           │
+    #       ○──────────────────╱
+    #
+    # ==========================================================
+
+    dim310_x = x_right + 75
+
+    # ----------------------------------------------------------
+    # TOP HORIZONTAL LINE
+    # ----------------------------------------------------------
+
+    ax.plot(
+        [hole_x, dim310_x],
+        [top_hole_y, top_hole_y],
+        color="black",
+        linewidth=0.8
+    )
+
+    # ----------------------------------------------------------
+    # BOTTOM HORIZONTAL LINE
+    # ----------------------------------------------------------
+
+    ax.plot(
+        [hole_x, dim310_x],
+        [bottom_hole_y, bottom_hole_y],
+        color="black",
+        linewidth=0.8
+    )
+
+    # ----------------------------------------------------------
+    # VERTICAL 310 LINE
+    # ----------------------------------------------------------
+
+    ax.plot(
+        [dim310_x, dim310_x],
+        [bottom_hole_y, top_hole_y],
+        color="black",
+        linewidth=0.8
+    )
+
+    # ----------------------------------------------------------
+    # TOP SLASH
+    # ----------------------------------------------------------
+
+    slash_tick(
+        dim310_x,
+        top_hole_y,
+        size=5
+    )
+
+    # ----------------------------------------------------------
+    # BOTTOM SLASH
+    # ----------------------------------------------------------
+
+    slash_tick(
+        dim310_x,
+        bottom_hole_y,
+        size=5
+    )
+
+    # ----------------------------------------------------------
+    # 310 LABEL
+    # ----------------------------------------------------------
+
+    ax.text(
+        dim310_x - 10,
+        (top_hole_y + bottom_hole_y) / 2,
+        f"{dimension_310:g}",
+        rotation=90,
+        ha="center",
+        va="center",
+        fontsize=13
+    )
+
+    # ==========================================================
+    # 11. 332 MM OVERALL DIMENSION
+    # ==========================================================
+    #
+    #       ─────────────────────╲
+    #                             │
+    #                            332
+    #                             │
+    #       ─────────────────────╱
+    #
+    # ==========================================================
+
+    dim332_x = x_right + 110
+
+    # Top extension
+    ax.plot(
+        [x_right, dim332_x],
+        [y_top, y_top],
+        color="black",
+        linewidth=0.65
+    )
+
+    # Bottom extension
+    ax.plot(
+        [x_right, dim332_x],
+        [y_bottom, y_bottom],
+        color="black",
+        linewidth=0.65
+    )
+
+    # Vertical 332 dimension
+    ax.plot(
+        [dim332_x, dim332_x],
+        [y_bottom, y_top],
+        color="black",
+        linewidth=0.8
+    )
+
+    # Top slash
+    slash_tick(
+        dim332_x,
+        y_top,
+        size=5
+    )
+
+    # Bottom slash
+    slash_tick(
+        dim332_x,
+        y_bottom,
+        size=5
+    )
+
+    # 332 text
+    ax.text(
+        dim332_x - 10,
+        height / 2,
+        f"{height:g}",
+        rotation=90,
+        ha="center",
+        va="center",
+        fontsize=13
+    )
+
+    # ==========================================================
+    # 12. HOLE CALLOUT
+    # ==========================================================
+    #
+    #       2 - Ø14 HOLE
+    #       ─────────────────────
+    #       FOR M12 BOLT
+    #             /
+    #            /
+    #           /
+    #          ○
+    #
+    # ==========================================================
+
+    note_x = x_right + 47
+    note_y = y_top + 84
+
+    # ----------------------------------------------------------
+    # First line
+    # ----------------------------------------------------------
+
+    ax.text(
+        note_x,
+        note_y,
+        f"{hole_count} – Ø{hole_diameter:g} HOLE",
+        ha="left",
+        va="bottom",
+        fontsize=13
+    )
+
+    # ----------------------------------------------------------
+    # Horizontal line below first line
+    # ----------------------------------------------------------
+
+    callout_line_y = note_y - 7
+
+    ax.plot(
+        [note_x - 4, note_x + 105],
+        [callout_line_y, callout_line_y],
+        color="black",
+        linewidth=0.9
+    )
+
+    # ----------------------------------------------------------
+    # FOR M12 BOLT
+    # ----------------------------------------------------------
+
+    ax.text(
+        note_x,
+        note_y - 20,
         f"FOR {bolt} BOLT",
-        fontsize=9
+        ha="left",
+        va="bottom",
+        fontsize=13
     )
 
-    # -----------------------------
-    # Thickness
-    # -----------------------------
+    # ==========================================================
+    # 13. LEADER LINE
+    # ==========================================================
 
-    ax.text(
-        x0 + width / 2,
-        y0 + height + 5,
-        f"{thickness} THK.",
-        ha="center",
-        fontsize=9
+    # The leader starts from the left end of the
+    # horizontal callout line and goes to the top hole.
+
+    leader_start_x = note_x - 4
+    leader_start_y = callout_line_y
+
+    leader_end_x = hole_x + 2
+    leader_end_y = top_hole_y + 4
+
+    ax.plot(
+        [leader_start_x, leader_end_x],
+        [leader_start_y, leader_end_y],
+        color="black",
+        linewidth=0.95
     )
 
-    # -----------------------------
-    # Part number
-    # -----------------------------
+    # ==========================================================
+    # 14. PART NO. 16
+    # ==========================================================
+
+    part_y = -32
 
     ax.text(
-        x0 - 10,
-        y0 - 55,
-        f"PART NO. {part_no}",
-        fontsize=12,
+        x_left - 15,
+        part_y,
+        f"PART NO.{part_no}",
+        ha="left",
+        va="top",
+        fontsize=17,
         fontweight="bold"
     )
 
-    # -----------------------------
-    # Material
-    # -----------------------------
-
-    ax.text(
-        x0 - 10,
-        y0 - 65,
-        f"MATERIAL: {material}",
-        fontsize=8
+    # Underline
+    ax.plot(
+        [x_left - 18, x_left + 72],
+        [part_y - 8, part_y - 8],
+        color="black",
+        linewidth=2.0
     )
 
-    # -----------------------------
-    # Scale
-    # -----------------------------
+    # ==========================================================
+    # 15. SCALE
+    # ==========================================================
+
+    scale_y = -60
 
     ax.text(
-        x0 + width + 40,
-        y0 - 55,
-        "SCALE 1:2",
-        fontsize=8
+        x_left - 13,
+        scale_y,
+        "(SCALE  1:2)",
+        ha="left",
+        va="top",
+        fontsize=15
     )
 
-    # -----------------------------
-    # Drawing settings
-    # -----------------------------
+    # Scale underline
+    ax.plot(
+        [x_left - 17, x_left + 68],
+        [scale_y - 8, scale_y - 8],
+        color="black",
+        linewidth=2.0
+    )
+
+    # ==========================================================
+    # 16. FINAL VIEW
+    # ==========================================================
 
     ax.set_aspect("equal")
 
+    # IMPORTANT:
+    # Fixed limits prevent the image from becoming excessively wide.
+
     ax.set_xlim(
-        x0 - 60,
-        x0 + width + 80
+        -25,
+        205
     )
 
     ax.set_ylim(
-        y0 - 80,
-        y0 + height + 80
+        -78,
+        465
     )
 
     ax.axis("off")
 
-    # -----------------------------
-    # Save image
-    # -----------------------------
+    # ==========================================================
+    # 17. SAVE
+    # ==========================================================
 
     plt.savefig(
         output_file,
-        dpi=300,
-        bbox_inches="tight"
+        dpi=200,
+        facecolor="white",
+        bbox_inches="tight",
+        pad_inches=0.05
     )
 
     plt.close(fig)
