@@ -3,7 +3,7 @@ import pandas as pd
 import os
 
 from bom_parser import parse_bom
-from diagram import create_part16_drawing
+from diagram import create_engineering_drawing
 
 
 # ==========================================================
@@ -22,12 +22,12 @@ st.set_page_config(
 # ==========================================================
 
 st.title("BOM Analysis using AI")
-st.subheader("BOM Excel → Part 16 Engineering Drawing")
 
+st.subheader("BOM Excel → Engineering Drawing")
 
 st.write(
-    "Upload the BOM Excel file. The application will read "
-    "Part No. 16 and generate its engineering drawing."
+    "Upload a BOM Excel file. The application will detect "
+    "the Part Number and extract the required engineering data."
 )
 
 
@@ -69,14 +69,106 @@ if uploaded_file is not None:
         )
 
         # --------------------------------------------------
-        # Parse Part 16
+        # Detect Part Number automatically
         # --------------------------------------------------
 
-        st.subheader("🔍 Part No. 16 Analysis")
+        part_columns = [
+            "Part No.",
+            "Part No",
+            "Item No.",
+            "Item No",
+            "Item Number",
+            "Part Number"
+        ]
+
+        detected_column = None
+
+        # First try exact column names
+        for column in part_columns:
+
+            if column in df.columns:
+                detected_column = column
+                break
+
+        # If not found, try case-insensitive matching
+        if detected_column is None:
+
+            normalized = {
+                str(c).strip().lower(): c
+                for c in df.columns
+            }
+
+            for column in [
+                "part no.",
+                "part no",
+                "item no.",
+                "item no",
+                "item number",
+                "part number"
+            ]:
+
+                if column in normalized:
+                    detected_column = normalized[column]
+                    break
+
+        if detected_column is None:
+
+            raise ValueError(
+                "Could not find the Part No. column in the Excel file."
+            )
+
+        # --------------------------------------------------
+        # Get first valid Part Number
+        # --------------------------------------------------
+
+        part_values = (
+            df[detected_column]
+            .dropna()
+            .astype(str)
+            .str.strip()
+        )
+
+        if part_values.empty:
+
+            raise ValueError(
+                "No Part Number was found in the Excel file."
+            )
+
+        # Convert first part number to integer
+        try:
+
+            part_no = int(
+                float(
+                    part_values.iloc[0]
+                )
+            )
+
+        except (ValueError, TypeError):
+
+            raise ValueError(
+                f"Invalid Part Number found: "
+                f"{part_values.iloc[0]}"
+            )
+
+        # --------------------------------------------------
+        # Show detected Part
+        # --------------------------------------------------
+
+        st.subheader(
+            f"🔍 Part No. {part_no} Analysis"
+        )
+
+        st.info(
+            f"Detected Part Number: {part_no}"
+        )
+
+        # --------------------------------------------------
+        # Parse detected part
+        # --------------------------------------------------
 
         part = parse_bom(
             df,
-            part_no=16
+            part_no=part_no
         )
 
         # --------------------------------------------------
@@ -132,15 +224,18 @@ if uploaded_file is not None:
         st.write("### Hole Information")
 
         st.write(
-            f"**Number of Holes:** {part['hole_count']}"
+            f"**Number of Holes:** "
+            f"{part['hole_count']}"
         )
 
         st.write(
-            f"**Hole Diameter:** Ø{part['hole_diameter']} mm"
+            f"**Hole Diameter:** "
+            f"Ø{part['hole_diameter']} mm"
         )
 
         st.write(
-            f"**Bolt:** {part['bolt']}"
+            f"**Bolt:** "
+            f"{part['bolt']}"
         )
 
         # --------------------------------------------------
@@ -149,38 +244,64 @@ if uploaded_file is not None:
 
         st.write("### Drawing Dimensions")
 
-        st.write(
-            f"**35 mm:** {part['dimension_35']} mm"
-        )
+        if part.get("dimension_35") is not None:
 
-        st.write(
-            f"**11 mm:** {part['dimension_11']} mm"
-        )
+            st.write(
+                f"**Horizontal Offset:** "
+                f"{part['dimension_35']} mm"
+            )
 
-        st.write(
-            f"**310 mm:** {part['dimension_310']} mm"
-        )
+        if part.get("dimension_11") is not None:
+
+            st.write(
+                f"**Vertical Offset:** "
+                f"{part['dimension_11']} mm"
+            )
+
+        if part.get("dimension_310") is not None:
+
+            st.write(
+                f"**Hole Spacing:** "
+                f"{part['dimension_310']} mm"
+            )
+
+        if part.get("horizontal_spacing") is not None:
+
+            st.write(
+                f"**Horizontal Hole Spacing:** "
+                f"{part['horizontal_spacing']} mm"
+            )
+
+        if part.get("vertical_spacing") is not None:
+
+            st.write(
+                f"**Vertical Hole Spacing:** "
+                f"{part['vertical_spacing']} mm"
+            )
 
         # --------------------------------------------------
-        # Generate Drawing Button
+        # Generate Drawing
         # --------------------------------------------------
 
         st.divider()
 
         generate = st.button(
-            "📐 Generate Part 16 Drawing",
+            f"📐 Generate Part {part_no} Drawing",
             type="primary"
         )
 
         if generate:
 
-            output_file = "Part_16_Drawing.png"
+            output_file = (
+                f"Part_{part_no}_Drawing.png"
+            )
 
             # ----------------------------------------------
-            # Generate drawing
+            # Automatically select drawing based on
+            # detected Part Number
             # ----------------------------------------------
 
-            create_part16_drawing(
+            create_engineering_drawing(
                 part,
                 output_file
             )
@@ -190,21 +311,22 @@ if uploaded_file is not None:
             # ----------------------------------------------
 
             st.success(
-                "Part No. 16 drawing generated successfully!"
+                f"Part No. {part_no} drawing "
+                f"generated successfully!"
             )
 
             st.subheader(
-                "📐 Generated Architecture / Engineering Drawing"
+                "📐 Generated Engineering Drawing"
             )
 
             st.image(
                 output_file,
-                caption="Part No. 16",
+                caption=f"Part No. {part_no}",
                 use_container_width=True
             )
 
             # ----------------------------------------------
-            # Download button
+            # Download
             # ----------------------------------------------
 
             if os.path.exists(output_file):
@@ -217,10 +339,9 @@ if uploaded_file is not None:
                     st.download_button(
                         label="⬇️ Download Drawing",
                         data=file,
-                        file_name="Part_16_Drawing.png",
+                        file_name=output_file,
                         mime="image/png"
                     )
-
 
     # ======================================================
     # ERROR HANDLING
